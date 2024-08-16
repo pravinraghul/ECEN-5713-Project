@@ -13,7 +13,5 @@ modules:
 
 endif
 
-
-
 clean:
 	rm -rf *.o *~ *.ko *.mod.c *.mod 

@@ -1,9 +1,12 @@
 #include <linux/module.h>
+#include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/string.h>
 #include <linux/fs.h>
 #include <linux/cdev.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
+#include <linux/delay.h>
 
 struct gpiobit_t {
     dev_t devnum;
@@ -26,26 +29,26 @@ static struct file_operations gpiobit_fops = {
 
 static int gpiobit_pinsetup(void) {
 
-	if(gpio_request(19, "gpio-clk")) {
+	if(gpio_request(21, "gpio-clk")) {
 		printk("Allocation failed for gpio-clk\n");
 		return -1;
 	}
 
-	if(gpio_direction_output(19, 0)) {
+	if(gpio_direction_output(21, 0)) {
 		printk("Direction set output failed for gpio-clk\n");
-		gpio_free(19);
+		gpio_free(21);
 		return -1;
 	}
 
 	if(gpio_request(26, "gpio-data")) {
 		printk("Allocation failed for gpio-data\n");
-		gpio_free(19);
+		gpio_free(21);
 		return -1;
 	}
 
 	if(gpio_direction_output(26, 0)) {
 		printk("Direction set output failed for gpio-data\n");
-		gpio_free(19);
+		gpio_free(21);
 		gpio_free(26);
 		return -1;
 	}
@@ -54,9 +57,9 @@ static int gpiobit_pinsetup(void) {
 }
 
 static void gpiobit_pinfree(void) {
-	gpio_set_value(19, 0);
+	gpio_set_value(21, 0);
 	gpio_set_value(26, 0);
-	gpio_free(19);
+	gpio_free(21);
 	gpio_free(26);
 }
 
@@ -70,29 +73,29 @@ int gpiobit_close(struct inode *device_file, struct file *instance) {
 	return 0;
 }
 
+void gpiobit_write_byte(char byte) {
+	char value;
+	int i;
+	printk("byte: %d\n", byte);
+	for (i = 0; i < 8; i++) {
+		value = (byte >> i) & 0x01;
+		printk("bit: %d, ", value);
+		gpio_set_value(26, value); // set the data
+		gpio_set_value(21, 1); // set clock 
+		msleep(50);
+		gpio_set_value(21, 0); // clear clock
+		msleep(50);
+	}
+	printk("\n");
+}
+
 ssize_t gpiobit_write(struct file *File, const char *user_buffer, size_t count, loff_t *offs) {
 	int to_copy, not_copied, delta;
 	char value;
-
 	to_copy = min(count, sizeof(value));
-
 	not_copied = copy_from_user(&value, user_buffer, to_copy);
-	printk("value: %c, count: %d, to_copy: %d\n", value, count, to_copy);
-	
-	switch(value) {
-		case '0':
-			gpio_set_value(26, 0);
-			break;
-		case '1':
-			gpio_set_value(26, 1);
-			break;
-		default:
-			printk("invalid gpio input\n");
-			break;
-	}
-
+	gpiobit_write_byte(value); // gpio write byte
 	delta = to_copy - not_copied;
-
 	return delta;
 }
 
