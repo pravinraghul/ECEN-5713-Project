@@ -76,15 +76,15 @@ int gpiobit_close(struct inode *device_file, struct file *instance) {
 void gpiobit_write_byte(char byte) {
 	char value;
 	int i;
-	printk("byte: %d\n", byte);
+	// printk("byte: %d\n", byte);
 	for (i = 0; i < 8; i++) {
 		value = (byte >> i) & 0x01;
-		printk("bit: %d, ", value);
+		// printk("bit: %d, ", value);
 		gpio_set_value(26, value); // set the data
 		gpio_set_value(21, 1); // set clock 
-		msleep(50);
+		msleep(25);
 		gpio_set_value(21, 0); // clear clock
-		msleep(50);
+		msleep(25);
 	}
 	printk("\n");
 }
