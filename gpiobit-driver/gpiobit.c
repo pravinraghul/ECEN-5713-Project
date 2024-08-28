@@ -8,6 +8,10 @@
 #include <linux/gpio.h>
 #include <linux/delay.h>
 
+#define GPIOBIT_IOC_MAGIC 0x15
+#define GPIOBIT_CLKPIN _IOWR(GPIOBIT_IOC_MAGIC, 1, unsigned long)
+#define GPIOBIT_DATAPIN _IOWR(GPIOBIT_IOC_MAGIC, 2, unsigned long)
+
 struct gpiobit_t {
     dev_t devnum;
     struct class *class;
@@ -19,12 +23,14 @@ struct gpiobit_t gpiobit;
 static int gpiobit_open(struct inode *device_file, struct file *instance);
 static int gpiobit_close(struct inode *device_file, struct file *instance);
 static ssize_t gpiobit_write(struct file *File, const char *user_buffer, size_t count, loff_t *offs);
+static long gpiobit_ioctl(struct file *File, unsigned int cmd, unsigned long arg);
 
 static struct file_operations gpiobit_fops = {
 	.owner = THIS_MODULE,
 	.open = gpiobit_open,
 	.release = gpiobit_close,
-	.write = gpiobit_write
+	.write = gpiobit_write,
+	.unlocked_ioctl = gpiobit_ioctl
 };
 
 static int gpiobit_pinsetup(void) {
@@ -64,29 +70,27 @@ static void gpiobit_pinfree(void) {
 }
 
 int gpiobit_open(struct inode *device_file, struct file *instance) {
-	printk("gpiobit open was called!\n");
+	// printk("gpiobit open was called!\n");
 	return 0;
 }
 
 int gpiobit_close(struct inode *device_file, struct file *instance) {
-	printk("gpiobit close was called!\n");
+	// printk("gpiobit close was called!\n");
 	return 0;
 }
 
 void gpiobit_write_byte(char byte) {
 	char value;
 	int i;
-	// printk("byte: %d\n", byte);
 	for (i = 0; i < 8; i++) {
 		value = (byte >> i) & 0x01;
-		// printk("bit: %d, ", value);
 		gpio_set_value(26, value); // set the data
 		gpio_set_value(21, 1); // set clock 
 		msleep(25);
 		gpio_set_value(21, 0); // clear clock
 		msleep(25);
 	}
-	printk("\n");
+	gpio_set_value(26, 0);
 }
 
 ssize_t gpiobit_write(struct file *File, const char *user_buffer, size_t count, loff_t *offs) {
@@ -97,6 +101,32 @@ ssize_t gpiobit_write(struct file *File, const char *user_buffer, size_t count, 
 	gpiobit_write_byte(value);
 	delta = to_copy - not_copied;
 	return delta;
+}
+
+/**
+ * Ioctl function to testing purpose
+ */
+long gpiobit_ioctl(struct file *File, unsigned int cmd, unsigned long arg) {
+	unsigned long value;
+
+	if(copy_from_user(&value ,(int32_t*) arg, sizeof(value))) {
+        printk("data write : Err!\n");
+    }
+
+	switch(cmd) {
+        case GPIOBIT_CLKPIN:
+			gpio_set_value(21, value);
+            printk("set clk_pin value = %ld\n", value);
+            break;
+        case GPIOBIT_DATAPIN:
+			gpio_set_value(26, value);
+            printk("set data_pin value = %ld\n", value);
+            break;
+        default:
+            printk("default\n");
+            break;
+    }
+	return 0;
 }
 
 static int __init gpiobit_init(void)
